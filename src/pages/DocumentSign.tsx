@@ -9,7 +9,7 @@ import type { SignedCertificate } from '../types/certificate'
 import { sha3_256 } from 'js-sha3'
 import { ulid } from 'ulid'
 import { useSignGuardStore } from '../store/signguardStore'
-import { behavioralCollector, cognitiveCollector, faceCollector } from '../signal-engine'
+import { behavioralCollector, cognitiveCollector, faceCollector, signalBus } from '../signal-engine'
 
 type Mode = 'pdf' | 'description'
 type Step = 'identity' | 'document' | 'selfie' | 'review' | 'certificate'
@@ -207,6 +207,19 @@ export function DocumentSign() {
   }, [])
 
   const [step, setStep] = useState<Step>('identity')
+
+  useEffect(() => {
+    if (step === 'selfie') {
+      signalBus.pause()
+
+      return () => {
+        signalBus.resume()
+      }
+    }
+
+    signalBus.resume()
+  }, [step])
+
   const [firstName, setFirstName] = useState(signer?.firstName ?? '')
   const [lastName, setLastName] = useState(signer?.lastName ?? '')
   const [signerId, setSignerId] = useState(signer?.idNumber ?? '')
