@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SelfieCapture } from '../components/SelfieCapture'
 import { verifyWorker } from '../services/api'
@@ -12,6 +12,150 @@ import { useSignGuardStore } from '../store/signguardStore'
 
 type Mode = 'pdf' | 'description'
 type Step = 'identity' | 'document' | 'selfie' | 'review' | 'certificate'
+
+type SignerIdentityFormProps = {
+  errorMsg: string
+  firstName: string
+  lastName: string
+  organization: string
+  role: string
+  signerId: string
+  onSubmit: (e: FormEvent) => void
+  onFirstNameChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onLastNameChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onSignerIdChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onOrganizationChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onRoleChange: (e: ChangeEvent<HTMLInputElement>) => void
+}
+
+const SignerIdentityForm = memo(function SignerIdentityForm({
+  errorMsg,
+  firstName,
+  lastName,
+  organization,
+  role,
+  signerId,
+  onSubmit,
+  onFirstNameChange,
+  onLastNameChange,
+  onSignerIdChange,
+  onOrganizationChange,
+  onRoleChange,
+}: SignerIdentityFormProps) {
+  return (
+    <form onSubmit={onSubmit} style={{ width: '100%', marginTop: 12 }}>
+      <div className="card">
+        <div className="badge badge-purple">Step 1 — Signer Identity</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="field">
+            <label>First Name *</label>
+            <input value={firstName} onChange={onFirstNameChange} />
+          </div>
+          <div className="field">
+            <label>Last Name *</label>
+            <input value={lastName} onChange={onLastNameChange} />
+          </div>
+        </div>
+        <div className="field">
+          <label>ID Number *</label>
+          <input value={signerId} onChange={onSignerIdChange} placeholder="Passport / National ID" />
+        </div>
+        <div className="field">
+          <label>Organization *</label>
+          <input value={organization} onChange={onOrganizationChange} placeholder="Acme Legal" />
+        </div>
+        <div className="field">
+          <label>Role / Title *</label>
+          <input value={role} onChange={onRoleChange} placeholder="General Counsel" />
+        </div>
+        <button className="btn btn-primary" type="submit">Continue →</button>
+      </div>
+      {errorMsg && (
+        <div className="card" style={{ width: '100%', borderColor: 'rgba(239,68,68,0.35)', color: 'var(--red)', fontSize: 13, lineHeight: 1.6, marginTop: 12 }}>
+          {errorMsg}
+        </div>
+      )}
+    </form>
+  )
+})
+
+type DocumentInputFormProps = {
+  contractRef: string
+  docDate: string
+  docTitle: string
+  errorMsg: string
+  mode: Mode
+  onBack: () => void
+  onContractRefChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onDateChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onModeChange: (e: ChangeEvent<HTMLSelectElement>) => void
+  onPdfFileChange: (e: ChangeEvent<HTMLInputElement>) => void
+  onSubmit: (e: FormEvent) => void
+  onTitleChange: (e: ChangeEvent<HTMLInputElement>) => void
+}
+
+const DocumentInputForm = memo(function DocumentInputForm({
+  contractRef,
+  docDate,
+  docTitle,
+  errorMsg,
+  mode,
+  onBack,
+  onContractRefChange,
+  onDateChange,
+  onModeChange,
+  onPdfFileChange,
+  onSubmit,
+  onTitleChange,
+}: DocumentInputFormProps) {
+  return (
+    <form onSubmit={onSubmit} style={{ width: '100%', marginTop: 12 }}>
+      <div className="card">
+        <div className="badge badge-purple">Step 2 — Document</div>
+
+        <div className="field">
+          <label>Document Input</label>
+          <select value={mode} onChange={onModeChange}>
+            <option value="pdf">Upload PDF</option>
+            <option value="description">Description (no file)</option>
+          </select>
+        </div>
+
+        {mode === 'pdf' ? (
+          <div className="field">
+            <label>PDF File *</label>
+            <input type="file" accept=".pdf" onChange={onPdfFileChange} />
+          </div>
+        ) : (
+          <>
+            <div className="field">
+              <label>Document title / description *</label>
+              <input value={docTitle} onChange={onTitleChange} placeholder="Service Agreement" />
+            </div>
+            <div className="field">
+              <label>Contract reference number *</label>
+              <input value={contractRef} onChange={onContractRefChange} placeholder="REF-2026-001" />
+            </div>
+            <div className="field">
+              <label>Date *</label>
+              <input value={docDate} onChange={onDateChange} placeholder="2026-03-22" />
+            </div>
+          </>
+        )}
+
+        <button className="btn btn-primary" type="submit">Compute Hash →</button>
+        <button className="btn btn-outline" type="button" style={{ marginTop: 10 }} onClick={onBack}>
+          Back
+        </button>
+      </div>
+      {errorMsg && (
+        <div className="card" style={{ width: '100%', borderColor: 'rgba(239,68,68,0.35)', color: 'var(--red)', fontSize: 13, lineHeight: 1.6, marginTop: 12 }}>
+          {errorMsg}
+        </div>
+      )}
+    </form>
+  )
+})
 
 function hashBytesToHex(bytes: Uint8Array): string {
   // js-sha3 wants an ArrayBuffer-like; we'll convert ourselves for type-safety
@@ -81,6 +225,46 @@ export function DocumentSign() {
     return d || 'Document description'
   }, [mode, pdfFile, docTitle])
 
+  const handleFirstNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setFirstName(e.target.value)
+  }, [])
+
+  const handleLastNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setLastName(e.target.value)
+  }, [])
+
+  const handleSignerIdChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setSignerId(e.target.value)
+  }, [])
+
+  const handleOrganizationChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setOrganization(e.target.value)
+  }, [])
+
+  const handleRoleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setRole(e.target.value)
+  }, [])
+
+  const handleModeChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
+    setMode(e.target.value as Mode)
+  }, [])
+
+  const handlePdfFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setPdfFile(e.target.files?.[0] ?? null)
+  }, [])
+
+  const handleDocTitleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setDocTitle(e.target.value)
+  }, [])
+
+  const handleContractRefChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setContractRef(e.target.value)
+  }, [])
+
+  const handleDocDateChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setDocDate(e.target.value)
+  }, [])
+
   async function computeHashFromPDF(file: File) {
     const bytes = await readFileAsUint8Array(file)
     const hex = hashBytesToHex(bytes)
@@ -100,7 +284,7 @@ export function DocumentSign() {
     setHashInfo({ name: payload.title || 'Description', size: bytes.length })
   }
 
-  function nextFromIdentity(e: React.FormEvent) {
+  const nextFromIdentity = useCallback((e: FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
     if (!firstName.trim() || !lastName.trim() || !signerId.trim() || !organization.trim() || !role.trim()) {
@@ -108,9 +292,9 @@ export function DocumentSign() {
       return
     }
     setStep('document')
-  }
+  }, [firstName, lastName, organization, role, signerId])
 
-  async function nextFromDocument(e: React.FormEvent) {
+  const nextFromDocument = useCallback(async (e: FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
 
@@ -132,7 +316,7 @@ export function DocumentSign() {
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to hash document')
     }
-  }
+  }, [computeHashFromPDF, computeHashFromText, docDate, docTitle, mode, pdfFile, contractRef])
 
   async function handleSelfie(b64: string) {
     setSelfieB64(b64)
@@ -207,84 +391,44 @@ export function DocumentSign() {
       <h1 className="step-title">Sign a Document</h1>
       <p className="step-sub">Verify your identity, hash the document, then sign with a post-quantum certificate.</p>
 
-      {errorMsg && (
-        <div className="card" style={{ width: '100%', borderColor: 'rgba(239,68,68,0.35)', color: 'var(--red)', fontSize: 13, lineHeight: 1.6 }}>
-          {errorMsg}
-        </div>
-      )}
-
       {step === 'identity' && (
-        <form onSubmit={nextFromIdentity} style={{ width: '100%', marginTop: 12 }}>
-          <div className="card">
-            <div className="badge badge-purple">Step 1 — Signer Identity</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="field">
-                <label>First Name *</label>
-                <input value={firstName} onChange={e => setFirstName(e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Last Name *</label>
-                <input value={lastName} onChange={e => setLastName(e.target.value)} />
-              </div>
-            </div>
-            <div className="field">
-              <label>ID Number *</label>
-              <input value={signerId} onChange={e => setSignerId(e.target.value)} placeholder="Passport / National ID" />
-            </div>
-            <div className="field">
-              <label>Organization *</label>
-              <input value={organization} onChange={e => setOrganization(e.target.value)} placeholder="Acme Legal" />
-            </div>
-            <div className="field">
-              <label>Role / Title *</label>
-              <input value={role} onChange={e => setRole(e.target.value)} placeholder="General Counsel" />
-            </div>
-            <button className="btn btn-primary" type="submit">Continue →</button>
-          </div>
-        </form>
+        <SignerIdentityForm
+          errorMsg={errorMsg}
+          firstName={firstName}
+          lastName={lastName}
+          organization={organization}
+          role={role}
+          signerId={signerId}
+          onSubmit={nextFromIdentity}
+          onFirstNameChange={handleFirstNameChange}
+          onLastNameChange={handleLastNameChange}
+          onSignerIdChange={handleSignerIdChange}
+          onOrganizationChange={handleOrganizationChange}
+          onRoleChange={handleRoleChange}
+        />
       )}
 
       {step === 'document' && (
-        <form onSubmit={nextFromDocument} style={{ width: '100%', marginTop: 12 }}>
-          <div className="card">
-            <div className="badge badge-purple">Step 2 — Document</div>
+        <DocumentInputForm
+          contractRef={contractRef}
+          docDate={docDate}
+          docTitle={docTitle}
+          errorMsg={errorMsg}
+          mode={mode}
+          onBack={() => setStep('identity')}
+          onContractRefChange={handleContractRefChange}
+          onDateChange={handleDocDateChange}
+          onModeChange={handleModeChange}
+          onPdfFileChange={handlePdfFileChange}
+          onSubmit={nextFromDocument}
+          onTitleChange={handleDocTitleChange}
+        />
+      )}
 
-            <div className="field">
-              <label>Document Input</label>
-              <select value={mode} onChange={e => setMode(e.target.value as Mode)}>
-                <option value="pdf">Upload PDF</option>
-                <option value="description">Description (no file)</option>
-              </select>
-            </div>
-
-            {mode === 'pdf' ? (
-              <div className="field">
-                <label>PDF File *</label>
-                <input type="file" accept=".pdf" onChange={e => setPdfFile(e.target.files?.[0] ?? null)} />
-              </div>
-            ) : (
-              <>
-                <div className="field">
-                  <label>Document title / description *</label>
-                  <input value={docTitle} onChange={e => setDocTitle(e.target.value)} placeholder="Service Agreement" />
-                </div>
-                <div className="field">
-                  <label>Contract reference number *</label>
-                  <input value={contractRef} onChange={e => setContractRef(e.target.value)} placeholder="REF-2026-001" />
-                </div>
-                <div className="field">
-                  <label>Date *</label>
-                  <input value={docDate} onChange={e => setDocDate(e.target.value)} placeholder="2026-03-22" />
-                </div>
-              </>
-            )}
-
-            <button className="btn btn-primary" type="submit">Compute Hash →</button>
-            <button className="btn btn-outline" type="button" style={{ marginTop: 10 }} onClick={() => setStep('identity')}>
-              Back
-            </button>
-          </div>
-        </form>
+      {step !== 'identity' && step !== 'document' && errorMsg && (
+        <div className="card" style={{ width: '100%', borderColor: 'rgba(239,68,68,0.35)', color: 'var(--red)', fontSize: 13, lineHeight: 1.6 }}>
+          {errorMsg}
+        </div>
       )}
 
       {step === 'selfie' && (
