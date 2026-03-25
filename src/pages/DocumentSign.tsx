@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SelfieCapture } from '../components/SelfieCapture'
 import { verifyWorker } from '../services/api'
@@ -9,6 +9,7 @@ import type { SignedCertificate } from '../types/certificate'
 import { sha3_256 } from 'js-sha3'
 import { ulid } from 'ulid'
 import { useSignGuardStore } from '../store/signguardStore'
+import { behavioralCollector, cognitiveCollector, faceCollector } from '../signal-engine'
 
 type Mode = 'pdf' | 'description'
 type Step = 'identity' | 'document' | 'selfie' | 'review' | 'certificate'
@@ -197,6 +198,14 @@ export function DocumentSign() {
   const nav = useNavigate()
   const { signer } = useSignGuardStore()
 
+  useEffect(() => {
+    behavioralCollector.start()
+
+    return () => {
+      behavioralCollector.stop()
+    }
+  }, [])
+
   const [step, setStep] = useState<Step>('identity')
   const [firstName, setFirstName] = useState(signer?.firstName ?? '')
   const [lastName, setLastName] = useState(signer?.lastName ?? '')
@@ -319,13 +328,23 @@ export function DocumentSign() {
   }, [computeHashFromPDF, computeHashFromText, docDate, docTitle, mode, pdfFile, contractRef])
 
   async function handleSelfie(b64: string) {
+    faceCollector.capture(b64)
     setSelfieB64(b64)
     setErrorMsg('')
     setSimilarity(null)
+    const startedAt = performance.now()
 
     try {
       const res = await verifyWorker({ selfie_b64: b64, first_name: firstName.trim(), last_name: lastName.trim() })
       const sim = Math.round(res.similarity)
+      const durationMs = Math.round(performance.now() - startedAt)
+
+      cognitiveCollector.record({
+        testId: 'sign',
+        score: sim,
+        durationMs,
+      })
+
       setSimilarity(sim)
       if (!res.verified || sim < 80) {
         setErrorMsg(`Identity verification failed (similarity: ${sim}%). Minimum: 80%`)
